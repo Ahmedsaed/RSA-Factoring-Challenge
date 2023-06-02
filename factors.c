@@ -89,4 +89,5 @@ void calculate_factors(mpz_t n, mpz_t p, mpz_t q)
     }
 
     mpz_clear(remainder);
+    mpz_clear(sqrt_n);
 }
