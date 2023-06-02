@@ -1,0 +1,4 @@
+build
+*temp
+objects
+.vscode
