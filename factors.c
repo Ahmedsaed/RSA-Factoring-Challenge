@@ -10,7 +10,7 @@
 #define true 1
 #define false 0
 #define BUFFER_SIZE 1024
-#define MAX_THREADS 1
+#define MAX_THREADS 8
 #define SIEVE_LIMIT 1000000
 
 struct ThreadData {
@@ -18,6 +18,7 @@ struct ThreadData {
     mpz_t p;
     mpz_t q;
     int* primes;
+    pthread_mutex_t* printMutex;
 };
 
 /* function prototypes */
@@ -48,6 +49,8 @@ int main(int argc, char **argv)
     pthread_t threads[MAX_THREADS];
     int threadCount = 0;
     struct ThreadData* threadData = NULL;
+    pthread_mutex_t printMutex;
+    pthread_mutex_init(&printMutex, NULL);
 
     while (true)
     {
@@ -65,6 +68,7 @@ int main(int argc, char **argv)
         mpz_init(threadData->p);
         mpz_init(threadData->q);
         threadData->primes = primes;
+        threadData->printMutex = &printMutex;
         mpz_set_str(threadData->n, line_buffer, 10);
 
         pthread_create(&threads[threadCount], NULL, calculate_factors, (void*)threadData);
@@ -86,6 +90,7 @@ int main(int argc, char **argv)
 
     fclose(fileStream);
     free(line_buffer);
+    pthread_mutex_destroy(&printMutex);
     return (0);
 }
 
@@ -101,7 +106,11 @@ void* calculate_factors(void* arg)
     if (mpz_cmp_ui(remainder, 0) == 0)
     {
         mpz_fdiv_q(threadData->q, threadData->n, threadData->p);
+
+        pthread_mutex_lock(threadData->printMutex);
         gmp_printf("%Zd=%Zd*%Zd\n", threadData->n, threadData->q, threadData->p);
+        pthread_mutex_unlock(threadData->printMutex);
+
         mpz_clear(remainder);
         mpz_clear(sqrt_n);
         mpz_clear(threadData->n);
@@ -119,20 +128,18 @@ void* calculate_factors(void* arg)
         int* primes = threadData->primes;
         for (mpz_set_ui(threadData->p, 2); mpz_cmp(threadData->p, sqrt_n) <= 0; mpz_add_ui(threadData->p, threadData->p, 1))
         {
+            mpz_fdiv_r(remainder, threadData->n, threadData->p);
             if (primes[mpz_get_ui(threadData->p)] && mpz_cmp_ui(remainder, 0) == 0)
             {
                 mpz_fdiv_q(threadData->q, threadData->n, threadData->p);
+
+                pthread_mutex_lock(threadData->printMutex);
                 gmp_printf("%Zd=%Zd*%Zd\n", threadData->n, threadData->q, threadData->p);
+                pthread_mutex_unlock(threadData->printMutex);
+
                 break;
             }
             mpz_fdiv_r(remainder, threadData->n, threadData->p);
-        }
-
-        if (mpz_cmp_ui(remainder, 0) != 0)
-        {
-            mpz_set(threadData->q, threadData->n);
-            mpz_set_ui(threadData->p, 1);
-            gmp_printf("%Zd=%Zd*%Zd\n", threadData->n, threadData->q, threadData->p);
         }
     }
     else
@@ -143,17 +150,25 @@ void* calculate_factors(void* arg)
             if (mpz_cmp_ui(remainder, 0) == 0)
             {
                 mpz_fdiv_q(threadData->q, threadData->n, threadData->p);
+
+                pthread_mutex_lock(threadData->printMutex);
                 gmp_printf("%Zd=%Zd*%Zd\n", threadData->n, threadData->q, threadData->p);
+                pthread_mutex_unlock(threadData->printMutex);
+
                 break;
             }
         }
+    }
 
-        if (mpz_cmp_ui(remainder, 0) != 0)
-        {
-            mpz_set(threadData->p, threadData->n);
-            mpz_set_ui(threadData->q, 1);
-            gmp_printf("%Zd=%Zd*%Zd\n", threadData->n, threadData->q, threadData->p);
-        }
+    // Check if the number is prime
+    if (mpz_cmp(threadData->p, sqrt_n) > 0)
+    {
+        mpz_set_ui(threadData->p, 1);
+        mpz_set(threadData->q, threadData->n);
+
+        pthread_mutex_lock(threadData->printMutex);
+        gmp_printf("%Zd=%Zd*%Zd\n", threadData->n, threadData->q, threadData->p);
+        pthread_mutex_unlock(threadData->printMutex);
     }
 
     mpz_clear(remainder);
@@ -168,6 +183,12 @@ void* calculate_factors(void* arg)
 
 void sieve_of_eratosthenes(int limit, int *primes)
 {
+    // Initialize all elements to 1 (assuming all numbers are prime)
+    for (int i = 2; i <= limit; i++)
+    {
+        primes[i] = 1;
+    }
+
     primes[0] = 0;
     primes[1] = 0;
 
