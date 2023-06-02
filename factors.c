@@ -44,7 +44,7 @@ int main(int argc, char **argv)
 
         calculate_factors(n, p, q);
 
-        gmp_printf("%Zd=%Zd*%Zd\n", n, p, q);
+        gmp_printf("%Zd=%Zd*%Zd\n", n, q, p);
     }
 
     mpz_clear(n);
@@ -78,7 +78,7 @@ void calculate_factors(mpz_t n, mpz_t p, mpz_t q)
     }
 
     mpz_sqrt(sqrt_n, n);
-    for (mpz_set_ui(p, 3); mpz_cmp(p, sqrt_n) < 0; mpz_add_ui(p, p, 2))
+    for (mpz_set_ui(p, 3); mpz_cmp(p, sqrt_n) <= 0; mpz_add_ui(p, p, 2))
     {
         mpz_fdiv_r(remainder, n, p);
         if (mpz_cmp_ui(remainder, 0) == 0)
