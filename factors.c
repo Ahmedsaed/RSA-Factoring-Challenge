@@ -10,7 +10,7 @@
 #define true 1
 #define false 0
 #define BUFFER_SIZE 1024
-#define MAX_THREADS 8
+#define MAX_THREADS 1
 #define SIEVE_LIMIT 1000000
 
 struct ThreadData {
