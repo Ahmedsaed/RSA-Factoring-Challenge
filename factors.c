@@ -1,5 +1,4 @@
 #include "main.h"
-#include <gmp.h>
 
 void calculate_factors(mpz_t n, mpz_t p, mpz_t q);
 
@@ -14,8 +13,8 @@ void calculate_factors(mpz_t n, mpz_t p, mpz_t q);
 int main(int argc, char **argv)
 {
     int fd;
-    size_t line_length;
-    char *line_buffer = NULL;
+    size_t line_buffer_size = 0;
+    char *line_buffer = malloc(line_buffer_size);
 
     fd = open(argv[1], O_RDONLY);
     if (fd < 0) {
@@ -37,7 +36,7 @@ int main(int argc, char **argv)
 
     while (true)
     {
-        if (getline(&line_buffer, &line_length, fileStream) < 0) {
+        if (getline(&line_buffer, &line_buffer_size, fileStream) < 0) {
             break;
         }
 
