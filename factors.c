@@ -15,7 +15,7 @@ int main(int argc, char **argv)
 {
     int fd;
     size_t line_length;
-    char *line_buffer;
+    char *line_buffer = NULL;
 
     fd = open(argv[1], O_RDONLY);
     if (fd < 0) {
@@ -25,6 +25,7 @@ int main(int argc, char **argv)
 
     FILE *fileStream = fdopen(fd, "r");
     if (fileStream == NULL) {
+        close(fd);
         perror("fdopen");
         exit(EXIT_FAILURE);
     }
@@ -52,6 +53,8 @@ int main(int argc, char **argv)
     mpz_clear(q);
 
     close(fd);
+    fclose(fileStream);
+    free(line_buffer);
     return (0);
 }
 
@@ -74,6 +77,8 @@ void calculate_factors(mpz_t n, mpz_t p, mpz_t q)
     if (mpz_cmp_ui(remainder, 0) == 0)
     {
         mpz_fdiv_q(q, n, p);
+        mpz_clear(remainder);
+        mpz_clear(sqrt_n);
         return;
     }
 

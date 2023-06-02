@@ -77,4 +77,4 @@ clear_screen:
 
 clean:
 	rm -rf $(OBJ_DIR)
-	rm -rf $(BUILD_DIR)
+	rm $(EXECUTABLE)
