@@ -127,6 +127,13 @@ void* calculate_factors(void* arg)
             }
             mpz_fdiv_r(remainder, threadData->n, threadData->p);
         }
+
+        if (mpz_cmp_ui(remainder, 0) != 0)
+        {
+            mpz_set(threadData->q, threadData->n);
+            mpz_set_ui(threadData->p, 1);
+            gmp_printf("%Zd=%Zd*%Zd\n", threadData->n, threadData->q, threadData->p);
+        }
     }
     else
     {
@@ -139,6 +146,13 @@ void* calculate_factors(void* arg)
                 gmp_printf("%Zd=%Zd*%Zd\n", threadData->n, threadData->q, threadData->p);
                 break;
             }
+        }
+
+        if (mpz_cmp_ui(remainder, 0) != 0)
+        {
+            mpz_set(threadData->p, threadData->n);
+            mpz_set_ui(threadData->q, 1);
+            gmp_printf("%Zd=%Zd*%Zd\n", threadData->n, threadData->q, threadData->p);
         }
     }
 
