@@ -1,11 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <fcntl.h>
-#include <string.h>
-#include <unistd.h>
 #include <stdint.h>
 #include <gmp.h>
+#include <ctype.h>
 #include <pthread.h>
+#include <string.h>
 
 #define UNUSED __attribute__((unused))
 #define true 1
@@ -21,6 +20,8 @@ struct ThreadData {
 
 /* function prototypes */
 void* calculate_factors(void* arg);
+int is_digit(char c);
+int is_numeric(char *s);
 
 /**
  * @brief entry point for the program
@@ -32,7 +33,6 @@ void* calculate_factors(void* arg);
  */
 int main(int argc, char **argv)
 {
-    int fd;
     size_t line_buffer_size = 0;
     char *line_buffer = NULL;
 
@@ -42,16 +42,8 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    fd = open(argv[1], O_RDONLY);
-    if (fd == -1) {
-        perror("open");
-        free(line_buffer);
-        return 1;
-    }
-
-    FILE *fileStream = fdopen(fd, "r");
+    FILE *fileStream = fopen(argv[1], "r");
     if (fileStream == NULL) {
-        close(fd);
         perror("fdopen");
         exit(EXIT_FAILURE);
     }
@@ -64,6 +56,11 @@ int main(int argc, char **argv)
     {
         if (getline(&line_buffer, &line_buffer_size, fileStream) < 0) {
             break;
+        }
+
+        // Skip empty lines
+        if (strlen(line_buffer) == 0) {
+            continue;
         }
 
         threadData = (struct ThreadData*)malloc(sizeof(struct ThreadData));
@@ -90,7 +87,6 @@ int main(int argc, char **argv)
     }
 
     fclose(fileStream);
-    close(fd);
     free(line_buffer);
     return (0);
 }
