@@ -1,6 +1,26 @@
-#include "main.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <fcntl.h>
+#include <string.h>
+#include <unistd.h>
+#include <stdint.h>
+#include <gmp.h>
+#include <pthread.h>
 
-void calculate_factors(mpz_t n, mpz_t p, mpz_t q);
+#define UNUSED __attribute__((unused))
+#define true 1
+#define false 0
+#define BUFFER_SIZE 1024
+#define MAX_THREADS 8
+
+struct ThreadData {
+    mpz_t n;
+    mpz_t p;
+    mpz_t q;
+};
+
+/* function prototypes */
+void* calculate_factors(void* arg);
 
 /**
  * @brief entry point for the program
@@ -14,12 +34,19 @@ int main(int argc, char **argv)
 {
     int fd;
     size_t line_buffer_size = 0;
-    char *line_buffer = malloc(line_buffer_size);
+    char *line_buffer = NULL;
+
+    if (argc < 2) {
+        fprintf(stderr, "Usage: %s <filename>\n", argv[0]);
+        free(line_buffer);
+        return 1;
+    }
 
     fd = open(argv[1], O_RDONLY);
-    if (fd < 0) {
+    if (fd == -1) {
         perror("open");
-        return (1);
+        free(line_buffer);
+        return 1;
     }
 
     FILE *fileStream = fdopen(fd, "r");
@@ -29,10 +56,9 @@ int main(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
 
-    mpz_t n, p, q;
-    mpz_init(n);
-    mpz_init(p);
-    mpz_init(q);
+    pthread_t threads[MAX_THREADS];
+    int threadCount = 0;
+    struct ThreadData* threadData = NULL;
 
     while (true)
     {
@@ -40,19 +66,31 @@ int main(int argc, char **argv)
             break;
         }
 
-        mpz_set_str(n, line_buffer, 10);
+        threadData = (struct ThreadData*)malloc(sizeof(struct ThreadData));
+        mpz_init(threadData->n);
+        mpz_init(threadData->p);
+        mpz_init(threadData->q);
+        mpz_set_str(threadData->n, line_buffer, 10);
 
-        calculate_factors(n, p, q);
+        pthread_create(&threads[threadCount], NULL, calculate_factors, (void*)threadData);
+        threadCount++;
 
-        gmp_printf("%Zd=%Zd*%Zd\n", n, q, p);
+        // Create additional threads if necessary
+        if (threadCount >= MAX_THREADS) {
+            for (int i = 0; i < threadCount; i++) {
+                pthread_join(threads[i], NULL);
+            }
+            threadCount = 0;
+        }
     }
 
-    mpz_clear(n);
-    mpz_clear(p);
-    mpz_clear(q);
+    // Wait for remaining threads to finish
+    for (int i = 0; i < threadCount; i++) {
+        pthread_join(threads[i], NULL);
+    }
 
-    close(fd);
     fclose(fileStream);
+    close(fd);
     free(line_buffer);
     return (0);
 }
@@ -61,37 +99,48 @@ int main(int argc, char **argv)
 /**
  * calculate_factors - calculates the factors of n
  *
- * @n: the number to calculate the factors of
- * @p: the pointer to the first factor
- * @q: the pointer to the second factor
+ * @param arg: pointer to a struct ThreadData
  */
-void calculate_factors(mpz_t n, mpz_t p, mpz_t q)
+void* calculate_factors(void* arg)
 {
+    struct ThreadData* threadData = (struct ThreadData*)arg;
     mpz_t remainder, sqrt_n;
     mpz_init(remainder);
     mpz_init(sqrt_n);
 
-    mpz_set_ui(p, 2);
-    mpz_fdiv_r(remainder, n, p);
+    mpz_set_ui(threadData->p, 2);
+    mpz_fdiv_r(remainder, threadData->n, threadData->p);
     if (mpz_cmp_ui(remainder, 0) == 0)
     {
-        mpz_fdiv_q(q, n, p);
+        mpz_fdiv_q(threadData->q, threadData->n, threadData->p);
+        gmp_printf("%Zd=%Zd*%Zd\n", threadData->n, threadData->q, threadData->p);
         mpz_clear(remainder);
         mpz_clear(sqrt_n);
-        return;
+        mpz_clear(threadData->n);
+        mpz_clear(threadData->p);
+        mpz_clear(threadData->q);
+        free(threadData);
+        pthread_exit(NULL);
     }
 
-    mpz_sqrt(sqrt_n, n);
-    for (mpz_set_ui(p, 3); mpz_cmp(p, sqrt_n) <= 0; mpz_add_ui(p, p, 2))
+    mpz_sqrt(sqrt_n, threadData->n);
+    for (mpz_set_ui(threadData->p, 3); mpz_cmp(threadData->p, sqrt_n) <= 0; mpz_add_ui(threadData->p, threadData->p, 2))
     {
-        mpz_fdiv_r(remainder, n, p);
+        mpz_fdiv_r(remainder, threadData->n, threadData->p);
         if (mpz_cmp_ui(remainder, 0) == 0)
         {
-            mpz_fdiv_q(q, n, p);
+            mpz_fdiv_q(threadData->q, threadData->n, threadData->p);
+            gmp_printf("%Zd=%Zd*%Zd\n", threadData->n, threadData->q, threadData->p);
             break;
         }
     }
 
     mpz_clear(remainder);
     mpz_clear(sqrt_n);
+    mpz_clear(threadData->n);
+    mpz_clear(threadData->p);
+    mpz_clear(threadData->q);
+    free(threadData);
+
+    pthread_exit(NULL);
 }

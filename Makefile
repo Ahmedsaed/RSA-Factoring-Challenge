@@ -14,7 +14,7 @@ SHELL := /bin/bash
 
 # Compiler flags
 CC := gcc
-CFLAGS := -Wall -ggdb3 -L/usr/local/gmp -lgmp
+CFLAGS := -Wall -L/usr/local/gmp -lgmp -pthread -O3 # -ggdb3 # -flto -finline-functions -ftree-vectorize -fomit-frame-pointer
 
 # Files
 SOURCE_FILES := $(wildcard $(SRC_DIR)/*.c)
@@ -71,6 +71,10 @@ announce:
 	@echo "------------------------------------------"
 	@printf "|%*s%s%*s|\n" $$(expr 20 - $${#MESSAGE} / 2) "" "$(MESSAGE)" $$(expr 20 - $$(($${#MESSAGE} + 1)) / 2) ""
 	@echo "------------------------------------------"
+
+check_memory:
+	@$(MAKE) announce MESSAGE="Checking memory leaks"
+	@valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./$(EXECUTABLE) $(TEST_DIR)/factors/all.txt
 
 clear_screen:
 	@clear
