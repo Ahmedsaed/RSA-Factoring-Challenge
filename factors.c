@@ -11,26 +11,19 @@
 #define false 0
 #define BUFFER_SIZE 1024
 #define MAX_THREADS 8
+#define SIEVE_LIMIT 1000000
 
 struct ThreadData {
     mpz_t n;
     mpz_t p;
     mpz_t q;
+    int* primes;
 };
 
 /* function prototypes */
 void* calculate_factors(void* arg);
-int is_digit(char c);
-int is_numeric(char *s);
+void sieve_of_eratosthenes(int limit, int *primes);
 
-/**
- * @brief entry point for the program
- *
- * @param argc
- * @param argv
- *
- * @return int
- */
 int main(int argc, char **argv)
 {
     size_t line_buffer_size = 0;
@@ -47,6 +40,10 @@ int main(int argc, char **argv)
         perror("fdopen");
         exit(EXIT_FAILURE);
     }
+
+    // Calculate the sieve of Eratosthenes
+    int primes[SIEVE_LIMIT + 1];
+    sieve_of_eratosthenes(SIEVE_LIMIT, primes);
 
     pthread_t threads[MAX_THREADS];
     int threadCount = 0;
@@ -67,6 +64,7 @@ int main(int argc, char **argv)
         mpz_init(threadData->n);
         mpz_init(threadData->p);
         mpz_init(threadData->q);
+        threadData->primes = primes;
         mpz_set_str(threadData->n, line_buffer, 10);
 
         pthread_create(&threads[threadCount], NULL, calculate_factors, (void*)threadData);
@@ -91,12 +89,6 @@ int main(int argc, char **argv)
     return (0);
 }
 
-
-/**
- * calculate_factors - calculates the factors of n
- *
- * @param arg: pointer to a struct ThreadData
- */
 void* calculate_factors(void* arg)
 {
     struct ThreadData* threadData = (struct ThreadData*)arg;
@@ -120,14 +112,33 @@ void* calculate_factors(void* arg)
     }
 
     mpz_sqrt(sqrt_n, threadData->n);
-    for (mpz_set_ui(threadData->p, 3); mpz_cmp(threadData->p, sqrt_n) <= 0; mpz_add_ui(threadData->p, threadData->p, 2))
+
+    // Check if the number is within the range of the sieve
+    if (mpz_cmp_ui(sqrt_n, SIEVE_LIMIT) <= 0)
     {
-        mpz_fdiv_r(remainder, threadData->n, threadData->p);
-        if (mpz_cmp_ui(remainder, 0) == 0)
+        int* primes = threadData->primes;
+        for (mpz_set_ui(threadData->p, 2); mpz_cmp(threadData->p, sqrt_n) <= 0; mpz_add_ui(threadData->p, threadData->p, 1))
         {
-            mpz_fdiv_q(threadData->q, threadData->n, threadData->p);
-            gmp_printf("%Zd=%Zd*%Zd\n", threadData->n, threadData->q, threadData->p);
-            break;
+            if (primes[mpz_get_ui(threadData->p)] && mpz_cmp_ui(remainder, 0) == 0)
+            {
+                mpz_fdiv_q(threadData->q, threadData->n, threadData->p);
+                gmp_printf("%Zd=%Zd*%Zd\n", threadData->n, threadData->q, threadData->p);
+                break;
+            }
+            mpz_fdiv_r(remainder, threadData->n, threadData->p);
+        }
+    }
+    else
+    {
+        for (mpz_set_ui(threadData->p, 3); mpz_cmp(threadData->p, sqrt_n) <= 0; mpz_add_ui(threadData->p, threadData->p, 2))
+        {
+            mpz_fdiv_r(remainder, threadData->n, threadData->p);
+            if (mpz_cmp_ui(remainder, 0) == 0)
+            {
+                mpz_fdiv_q(threadData->q, threadData->n, threadData->p);
+                gmp_printf("%Zd=%Zd*%Zd\n", threadData->n, threadData->q, threadData->p);
+                break;
+            }
         }
     }
 
@@ -139,4 +150,21 @@ void* calculate_factors(void* arg)
     free(threadData);
 
     pthread_exit(NULL);
+}
+
+void sieve_of_eratosthenes(int limit, int *primes)
+{
+    primes[0] = 0;
+    primes[1] = 0;
+
+    for (int p = 2; p * p <= limit; p++)
+    {
+        if (primes[p])
+        {
+            for (int i = p * p; i <= limit; i += p)
+            {
+                primes[i] = 0;
+            }
+        }
+    }
 }
